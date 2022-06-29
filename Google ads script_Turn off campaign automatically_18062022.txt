@@ -1,0 +1,134 @@
+/**
+MODIFY YOUR SETTINGS HERE
+*/
+var kpiName = "getCost";	//getClicks,getCost,getImpressions,getViewRate,getViews,getConversions,getConversionRate,getAverageCpc,getAverageCpm,getAverageCpv,getCtr,getAveragePageviews,getAverageTimeonSite,getBounceRate 
+var kpiNumber = 10;
+var timeline = "ALL_TIME";	//ALL_TIME,TODAY,YESTERDAY,LAST_7_DAYS,LAST_14_DAYS,LAST_30_DAYS,LAST_WEEK,LAST_MONTH,THIS_MONTH
+
+var level = "SemCampaign";	//SemCampaign,SemAdGroups,GdnCampaign,GdnAdGroups,VideoCampaign,VideoAdGroups,ShoppingCampaign,ShoppingAdGroups
+var operator = "CONTAINS_IGNORE_CASE";	//STARTS_WITH,STARTS_WITH_IGNORE_CASE,CONTAINS,CONTAINS_IGNORE_CASE,DOES_NOT_CONTAIN,DOES_NOT_CONTAIN_IGNORE_CASE
+var searchName = "Campaign Name";
+
+var mailList = "ductranhoang.tlh@gmail.com,demo@gmail.com";  //insert email list here, each email separated by ","
+var subjectText = "[Google Ads Alert]: Campaign Đã Đạt KPI";
+var bodyText = "Campaign đã dạt KPI, vào kiểm tra ngay khi có thể nhé!";
+
+
+
+
+
+
+
+
+
+
+/**
+*
+DO NOT MODIFY ANYTHING BELOW
+*
+*/
+
+var levelList = {
+	"SemCampaign":"campaigns",
+	"SemAdGroups":"adGroups",
+	"GdnCampaign":"campaigns",
+	"GdnAdGroups":"adGroups",
+	"VideoCampaign":"videoCampaigns",
+	"VideoAdGroups":"videoAdGroups",
+	"ShoppingCampaign":"shoppingCampaigns",
+	"ShoppingAdGroups":"shoppingAdGroups"
+}
+
+if (level == "SemCampaign" | level == "GdnCampaign" | level == "VideoCampaign" | level == "ShoppingCampaign") {
+	var levelSelector = eval(`AdsApp.${levelList[level]}().withCondition("CampaignName ${operator} '${searchName}'")`);
+} else if (level == "SemAdGroups" | level == "GdnAdGroups" | level == "VideoAdGroups" | level == "ShoppingAdGroups") {
+	var levelSelector = eval(`AdsApp.${levelList[level]}().withCondition("AdGroupName ${operator} '${searchName}'")`);
+} else {
+	Logger.log("Error: Wrong level-----------");
+}
+
+
+
+var countRepeat = 1;
+function main() {
+   var levelEnabledCount = 0;
+
+   var levelIterator = levelSelector.get();
+   while(levelIterator.hasNext()){
+		var levelName = levelIterator.next();
+		var levelIsEnable = levelName.isEnabled();
+
+		if (levelIsEnable){
+			try{
+				try{ 
+					Logger.log(`CampaignName: ${levelName.getVideoCampaign().getName()} | AdGroupName: ${levelName.getName()} | Enable: ${levelIsEnable}`);
+				} catch (e){
+					Logger.log(`CampaignName: ${levelName.getCampaign().getName()} | AdGroupName: ${levelName.getName()} | Enable: ${levelIsEnable}`);
+				}
+			}catch (err) {
+				Logger.log(`CampaignName: ${levelName.getName()} | Enable: ${levelIsEnable}`);
+			}
+				
+			levelEnabledCount += 1;
+			checkKpi(levelName);
+		}
+	}
+
+	longSleep();
+
+}
+
+
+//-------------------------------------------------------------------------------
+function checkKpi(levelName){  
+	var currentKpi = 0;
+	var stats = levelName.getStatsFor(timeline);
+	eval(`currentKpi += stats.${kpiName}()`);
+    Logger.log(`${levelName.getName()} | Current KPI: ${currentKpi}`);
+  		
+		if ((currentKpi >= kpiNumber)){
+			levelName.pause();
+			Logger.log(`${levelName.getName()} | Exceed KPI -> Turn Off Campaign`);
+			sendEmails(currentKpi,levelName);
+		} else {
+			Logger.log(`${levelName.getName()} | Has not reached KPI`);
+		}
+
+	Logger.log("Function checkKpi: Done-----------");
+}
+
+//-------------------------------------------------------------------------------
+function longSleep(){
+	if(countRepeat > 2) { //run 3 times
+		Logger.log(`Repeat: ${countRepeat}-----------`);
+		countRepeat += 1;
+		Logger.log("-----------Script End-----------");
+	} else {
+		Logger.log(`Repeat: ${countRepeat}-----------`);
+		for (var i = 0; i < 3; i++) {	//loop x3 times of 4.5 minutes = 13.5 minutes
+			//Utilities.sleep(4.5*60);	//testing
+			Utilities.sleep(4.5*60000);	//sleep 4.5 minutes
+		}
+		countRepeat += 1;
+		return main();
+	}
+}
+
+
+//-------------------------------------------------------------------------------
+function sendEmails(currentKpi,levelName) {
+	var bodyText2 = `<br><b>- Level:</b> ${level}
+					 <br><b>- Name:</b> ${levelName.getName()}
+					 <br><b>- KPI name:</b> ${kpiName}
+					 <br><b>- KPI avchieved:</b> ${currentKpi}/${kpiNumber}`;
+	var mainBody = bodyText.concat(bodyText2);
+
+      MailApp.sendEmail({
+      to: mailList,
+      subject: subjectText,
+      htmlBody: mainBody
+      });
+ 
+Logger.log("Email alert has been sent");
+}
+
